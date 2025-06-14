@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+    --radius: 0.5rem;
+
+    /* Custom luxury colors */
+    --cream-50: 45 100% 99%;
+    --cream-100: 45 100% 97%;
+    --cream-200: 45 100% 94%;
+    --gold-400: 45 93% 47%;
+    --gold-500: 45 93% 42%;
+    --charcoal-800: 0 0% 18%;
+    --charcoal-900: 0 0% 10%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+
+    /* Dark mode luxury colors */
+    --cream-50: 240 10% 8%;
+    --cream-100: 240 8% 12%;
+    --cream-200: 240 6% 16%;
+    --gold-400: 45 93% 47%;
+    --gold-500: 45 93% 42%;
+    --charcoal-800: 0 0% 82%;
+    --charcoal-900: 0 0% 90%;
+  }
+}
+
+@layer utilities {
+  .font-playfair {
+    font-family: var(--font-playfair);
+  }
+
+  .font-inter {
+    font-family: var(--font-inter);
+  }
+
+  .bg-cream-50 {
+    background-color: hsl(var(--cream-50));
+  }
+
+  .bg-cream-100 {
+    background-color: hsl(var(--cream-100));
+  }
+
+  .bg-cream-200 {
+    background-color: hsl(var(--cream-200));
+  }
+
+  .text-gold-400 {
+    color: hsl(var(--gold-400));
+  }
+
+  .text-gold-500 {
+    color: hsl(var(--gold-500));
+  }
+
+  .text-charcoal-800 {
+    color: hsl(var(--charcoal-800));
+  }
+
+  .text-charcoal-900 {
+    color: hsl(var(--charcoal-900));
+  }
+
+  .border-gold-400 {
+    border-color: hsl(var(--gold-400));
+  }
+
+  .hover\:bg-gold-400:hover {
+    background-color: hsl(var(--gold-400));
+  }
+
+  .hover\:text-gold-400:hover {
+    color: hsl(var(--gold-400));
+  }
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--cream-50));
+  color: hsl(var(--charcoal-900));
+}
