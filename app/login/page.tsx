@@ -121,12 +121,6 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-
-        <div className="mt-6 text-center text-sm text-charcoal-600">
-          <p>Demo Accounts:</p>
-          <p>Admin: admin@carryluxe.com / admin123</p>
-          <p>Customer: customer@example.com / admin123</p>
-        </div>
       </motion.div>
     </div>
   )

@@ -8,7 +8,7 @@ import ProductCard from "@/components/ProductCard"
 import Footer from "@/components/layout/Footer"
 import { products } from "@/lib/data"
 import { motion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export default function HomePage() {
@@ -16,9 +16,13 @@ export default function HomePage() {
     heroTitle: "Elevated Luxury.\nTimeless Icons.",
     heroSubtitle:
       "Discover the world's most coveted handbags from Hermès and Louis Vuitton.\nWhere heritage meets contemporary elegance.",
-    heroImage: "/placeholder.svg?height=1080&width=1920",
-    heroVideo: "",
-    useVideo: false,
+    heroMedia: [
+      {
+        type: "image",
+        url: "/placeholder.svg?height=1080&width=1920",
+        alt: "Luxury handbags collection",
+      },
+    ],
     hermesTitle: "Hermès",
     hermesDescription: "The pinnacle of French craftsmanship since 1837",
     hermesImage: "/placeholder.svg?height=400&width=600",
@@ -34,12 +38,15 @@ export default function HomePage() {
       "Become part of an exclusive community that appreciates the finest in luxury craftsmanship. Discover pieces that transcend trends and define timeless elegance.",
   })
 
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
+
   useEffect(() => {
     // Load saved homepage settings
     const savedSettings = localStorage.getItem("carryluxe-homepage-settings")
     if (savedSettings) {
       try {
-        setHomePageContent(JSON.parse(savedSettings))
+        const parsed = JSON.parse(savedSettings)
+        setHomePageContent(parsed)
       } catch (e) {
         console.error("Failed to parse homepage settings", e)
       }
@@ -57,10 +64,29 @@ export default function HomePage() {
     }
   }, [])
 
+  // Auto-advance carousel every 4 seconds
+  useEffect(() => {
+    if (homePageContent.heroMedia && homePageContent.heroMedia.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentMediaIndex((prev) => (prev === homePageContent.heroMedia.length - 1 ? 0 : prev + 1))
+      }, 4000)
+
+      return () => clearInterval(interval)
+    }
+  }, [homePageContent.heroMedia])
+
   const featuredProducts = products.filter((p) => p.featured)
   const hermesProducts = products.filter((p) => p.category === "Hermès")
   const lvProducts = products.filter((p) => p.category === "Louis Vuitton")
   const trendingBags = products.filter((p) => p.newArrival).slice(0, 3)
+
+  const nextMedia = () => {
+    setCurrentMediaIndex((prev) => (prev === homePageContent.heroMedia.length - 1 ? 0 : prev + 1))
+  }
+
+  const prevMedia = () => {
+    setCurrentMediaIndex((prev) => (prev === 0 ? homePageContent.heroMedia.length - 1 : prev - 1))
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -83,24 +109,19 @@ export default function HomePage() {
     },
   }
 
+  const currentMedia = homePageContent.heroMedia?.[currentMediaIndex] || homePageContent.heroMedia?.[0]
+
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* Hero Section with Carousel */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          {homePageContent.useVideo && homePageContent.heroVideo ? (
-            <video
-              src={homePageContent.heroVideo}
-              className="w-full h-full object-cover"
-              autoPlay
-              muted
-              loop
-              playsInline
-            />
+          {currentMedia?.type === "video" ? (
+            <video src={currentMedia.url} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : (
             <Image
-              src={homePageContent.heroImage || "/placeholder.svg?height=1080&width=1920"}
-              alt="Luxury handbags"
+              src={currentMedia?.url || "/placeholder.svg?height=1080&width=1920"}
+              alt={currentMedia?.alt || "Luxury handbags"}
               fill
               className="object-cover"
               priority
@@ -108,6 +129,37 @@ export default function HomePage() {
           )}
           <div className="absolute inset-0 bg-black bg-opacity-40" />
         </div>
+
+        {/* Carousel Controls */}
+        {homePageContent.heroMedia && homePageContent.heroMedia.length > 1 && (
+          <>
+            <button
+              onClick={prevMedia}
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 rounded-full p-2 transition-colors"
+            >
+              <ChevronLeft className="h-6 w-6 text-white" />
+            </button>
+            <button
+              onClick={nextMedia}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 rounded-full p-2 transition-colors"
+            >
+              <ChevronRight className="h-6 w-6 text-white" />
+            </button>
+
+            {/* Carousel Indicators */}
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
+              {homePageContent.heroMedia.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentMediaIndex(index)}
+                  className={`w-3 h-3 rounded-full transition-colors ${
+                    index === currentMediaIndex ? "bg-white" : "bg-white/50"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 50 }}

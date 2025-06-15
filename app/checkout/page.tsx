@@ -2,21 +2,17 @@
 
 import type React from "react"
 import { useState } from "react"
-import { loadStripe } from "@stripe/stripe-js"
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Lock } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { ShoppingBag, CreditCard, Truck, MessageCircle, Mail } from "lucide-react"
 import { useCart } from "@/components/providers/CartProvider"
 import { motion } from "framer-motion"
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_...")
-
-// US States for payment processing
+// US States for shipping
 const US_STATES = [
   { value: "AL", label: "Alabama" },
   { value: "AZ", label: "Arizona" },
@@ -60,12 +56,10 @@ const US_STATES = [
   { value: "WI", label: "Wisconsin" },
 ]
 
-function CheckoutForm() {
-  const stripe = useStripe()
-  const elements = useElements()
+export default function CheckoutPage() {
   const { cartItems, getTotalPrice, clearCart } = useCart()
   const [isLoading, setIsLoading] = useState(false)
-  const [sameAsShipping, setSameAsShipping] = useState(true)
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer")
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -75,6 +69,7 @@ function CheckoutForm() {
     city: "",
     state: "",
     zipCode: "",
+    notes: "",
   })
 
   const subtotal = getTotalPrice()
@@ -82,7 +77,7 @@ function CheckoutForm() {
   const tax = subtotal * 0.08
   const total = subtotal + shipping + tax
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
@@ -91,51 +86,41 @@ function CheckoutForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!stripe || !elements) {
-      return
-    }
-
     setIsLoading(true)
 
-    const cardElement = elements.getElement(CardElement)
-
-    if (!cardElement) {
-      setIsLoading(false)
-      return
-    }
-
     try {
-      // Create payment method
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: "card",
-        card: cardElement,
-        billing_details: {
-          name: `${formData.firstName} ${formData.lastName}`,
-          email: formData.email,
-          phone: formData.phone,
-          address: {
-            line1: formData.address,
-            city: formData.city,
-            state: formData.state,
-            postal_code: formData.zipCode,
-          },
+      // Send order notification email
+      const orderData = {
+        customer: formData,
+        items: cartItems,
+        paymentMethod,
+        totals: {
+          subtotal,
+          shipping,
+          tax,
+          total,
         },
-      })
-
-      if (error) {
-        console.error("Payment method creation failed:", error)
-        setIsLoading(false)
-        return
+        orderDate: new Date().toISOString(),
       }
 
-      // Simulate payment processing
-      setTimeout(() => {
+      const response = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      })
+
+      if (response.ok) {
         clearCart()
         window.location.href = "/order-confirmation"
-      }, 2000)
+      } else {
+        throw new Error("Failed to process order")
+      }
     } catch (error) {
-      console.error("Payment failed:", error)
+      console.error("Order processing error:", error)
+      alert("There was an error processing your order. Please try again or contact us directly.")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -154,8 +139,9 @@ function CheckoutForm() {
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Shipping Information */}
+            {/* Order Form */}
             <div className="space-y-6">
+              {/* Shipping Information */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -164,7 +150,7 @@ function CheckoutForm() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
-                      <span>1</span>
+                      <Truck className="h-5 w-5" />
                       <span>Shipping Information</span>
                     </CardTitle>
                   </CardHeader>
@@ -262,6 +248,7 @@ function CheckoutForm() {
                 </Card>
               </motion.div>
 
+              {/* Payment Method */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -270,33 +257,82 @@ function CheckoutForm() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
-                      <span>2</span>
-                      <span>Payment Information</span>
+                      <CreditCard className="h-5 w-5" />
+                      <span>Payment Method</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Checkbox id="sameAsShipping" checked={sameAsShipping} onCheckedChange={setSameAsShipping} />
-                      <Label htmlFor="sameAsShipping">Billing address same as shipping</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-cream-50 cursor-pointer">
+                        <input
+                          type="radio"
+                          id="bank_transfer"
+                          name="payment"
+                          value="bank_transfer"
+                          checked={paymentMethod === "bank_transfer"}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        />
+                        <Label htmlFor="bank_transfer" className="cursor-pointer flex-1">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">🏦</div>
+                            <span className="font-medium">Bank Transfer</span>
+                          </div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-cream-50 cursor-pointer">
+                        <input
+                          type="radio"
+                          id="apple_pay"
+                          name="payment"
+                          value="apple_pay"
+                          checked={paymentMethod === "apple_pay"}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        />
+                        <Label htmlFor="apple_pay" className="cursor-pointer flex-1">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-black rounded flex items-center justify-center">🍎</div>
+                            <span className="font-medium">Apple Pay</span>
+                          </div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-cream-50 cursor-pointer">
+                        <input
+                          type="radio"
+                          id="zelle"
+                          name="payment"
+                          value="zelle"
+                          checked={paymentMethod === "zelle"}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        />
+                        <Label htmlFor="zelle" className="cursor-pointer flex-1">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center">💜</div>
+                            <span className="font-medium">Zelle</span>
+                          </div>
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-2">Payment Instructions:</h4>
+                      <p className="text-sm text-charcoal-800">
+                        After placing your order, we'll send you payment details via email within 24 hours. Your order
+                        will be processed once payment is confirmed.
+                      </p>
                     </div>
 
                     <div>
-                      <Label htmlFor="cardElement">Card Information</Label>
-                      <div className="mt-1 p-3 border border-gray-300 rounded-md">
-                        <CardElement
-                          options={{
-                            style: {
-                              base: {
-                                fontSize: "16px",
-                                color: "#424770",
-                                "::placeholder": {
-                                  color: "#aab7c4",
-                                },
-                              },
-                            },
-                          }}
-                        />
-                      </div>
+                      <Label htmlFor="notes">Order Notes (Optional)</Label>
+                      <Textarea
+                        id="notes"
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                        placeholder="Any special instructions for your order..."
+                        rows={3}
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -312,7 +348,10 @@ function CheckoutForm() {
               >
                 <Card className="sticky top-8">
                   <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
+                    <CardTitle className="flex items-center space-x-2">
+                      <ShoppingBag className="h-5 w-5" />
+                      <span>Order Summary</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
@@ -356,14 +395,13 @@ function CheckoutForm() {
                       type="submit"
                       size="lg"
                       className="w-full bg-charcoal-900 hover:bg-charcoal-800"
-                      disabled={isLoading || !stripe}
+                      disabled={isLoading}
                     >
-                      <Lock className="h-4 w-4 mr-2" />
-                      {isLoading ? "Processing..." : "Complete Order"}
+                      {isLoading ? "Processing Order..." : "Place Order"}
                     </Button>
 
                     <p className="text-xs text-center text-charcoal-800">
-                      Your payment information is secure and encrypted
+                      By placing your order, you agree to our Terms of Service and Privacy Policy
                     </p>
                   </CardContent>
                 </Card>
@@ -371,15 +409,40 @@ function CheckoutForm() {
             </div>
           </div>
         </form>
+
+        {/* Contact Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-12 text-center"
+        >
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h3 className="font-semibold text-lg mb-4">Need Help with Your Order?</h3>
+            <p className="text-charcoal-800 mb-4">
+              Have questions or need assistance? Contact us directly for immediate support.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <a
+                href="https://wa.me/16188509790?text=Hi%20CarryLuxe,%20I%20need%20help%20with%20my%20order"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>WhatsApp</span>
+              </a>
+              <a
+                href="mailto:carryluxe3@gmail.com?subject=Order%20Assistance%20Needed"
+                className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <Mail className="h-4 w-4" />
+                <span>Email Us</span>
+              </a>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
-  )
-}
-
-export default function CheckoutPage() {
-  return (
-    <Elements stripe={stripePromise}>
-      <CheckoutForm />
-    </Elements>
   )
 }

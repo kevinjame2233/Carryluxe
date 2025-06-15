@@ -28,6 +28,9 @@ import {
   Facebook,
   Twitter,
   X,
+  Upload,
+  ImageIcon,
+  Video,
 } from "lucide-react"
 import { products as initialProducts, orders, users as initialUsers } from "@/lib/data"
 import { motion } from "framer-motion"
@@ -120,9 +123,13 @@ export default function AdminDashboard() {
     heroTitle: "Elevated Luxury.\nTimeless Icons.",
     heroSubtitle:
       "Discover the world's most coveted handbags from Hermès and Louis Vuitton.\nWhere heritage meets contemporary elegance.",
-    heroImage: "/placeholder.svg?height=1080&width=1920",
-    heroVideo: "",
-    useVideo: false,
+    heroMedia: [
+      {
+        type: "image",
+        url: "/placeholder.svg?height=1080&width=1920",
+        alt: "Luxury handbags collection",
+      },
+    ],
     hermesTitle: "Hermès",
     hermesDescription: "The pinnacle of French craftsmanship since 1837",
     hermesImage: "/placeholder.svg?height=400&width=600",
@@ -204,7 +211,7 @@ export default function AdminDashboard() {
         featured: false,
         newArrival: false,
         image: "/placeholder.svg?height=400&width=400",
-        images: ["/placeholder.svg?height=600&width=600"],
+        images: [],
       })
       setIsEditMode(false)
     }
@@ -422,6 +429,24 @@ export default function AdminDashboard() {
       console.error("Failed to save homepage settings:", error)
       alert("Failed to save homepage settings. Please try again.")
     }
+  }
+
+  // Hero media management
+  const addHeroMedia = (type, url, alt = "") => {
+    const newMedia = { type, url, alt }
+    setHomePageSettings({
+      ...homePageSettings,
+      heroMedia: [...(homePageSettings.heroMedia || []), newMedia],
+    })
+  }
+
+  const removeHeroMedia = (index) => {
+    const newMedia = [...homePageSettings.heroMedia]
+    newMedia.splice(index, 1)
+    setHomePageSettings({
+      ...homePageSettings,
+      heroMedia: newMedia,
+    })
   }
 
   // Filter functions
@@ -880,35 +905,34 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
 
-                {/* Hero Section Preview */}
+                {/* Hero Carousel Preview */}
                 <Card className="mb-6">
                   <CardHeader>
-                    <CardTitle>Hero Section</CardTitle>
+                    <CardTitle>Hero Carousel ({homePageSettings.heroMedia?.length || 0} items)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="relative h-48 bg-cream-100 rounded-lg overflow-hidden mb-4">
-                      {homePageSettings.useVideo && homePageSettings.heroVideo ? (
-                        <video
-                          src={homePageSettings.heroVideo}
-                          className="w-full h-full object-cover"
-                          muted
-                          loop
-                          autoPlay
-                        />
-                      ) : (
-                        <Image
-                          src={homePageSettings.heroImage || "/placeholder.svg"}
-                          alt="Hero background"
-                          fill
-                          className="object-cover"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-                        <div className="text-center text-white">
-                          <h3 className="text-2xl font-bold mb-2">{homePageSettings.heroTitle}</h3>
-                          <p className="text-sm">{homePageSettings.heroSubtitle}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {homePageSettings.heroMedia?.map((media, index) => (
+                        <div key={index} className="relative h-32 bg-cream-100 rounded overflow-hidden">
+                          {media.type === "video" ? (
+                            <video src={media.url} className="w-full h-full object-cover" muted />
+                          ) : (
+                            <Image
+                              src={media.url || "/placeholder.svg"}
+                              alt={media.alt || "Hero media"}
+                              fill
+                              className="object-cover"
+                            />
+                          )}
+                          <div className="absolute top-2 right-2">
+                            <Badge variant={media.type === "video" ? "default" : "secondary"}>{media.type}</Badge>
+                          </div>
                         </div>
-                      </div>
+                      )) || (
+                        <div className="col-span-full text-center py-8 text-charcoal-800">
+                          No hero media uploaded yet
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1168,9 +1192,9 @@ export default function AdminDashboard() {
             </TabsContent>
           </Tabs>
 
-          {/* Product Dialog */}
+          {/* Product Dialog with Enhanced Image Upload */}
           <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{isEditMode ? "Edit Product" : "Add New Product"}</DialogTitle>
                 <DialogDescription>
@@ -1264,27 +1288,30 @@ export default function AdminDashboard() {
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <Label>Additional Images</Label>
+                    <Label>Product Gallery (Up to 10 images)</Label>
                     <Input
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          const reader = new FileReader()
-                          reader.onload = (event) => {
-                            setProductForm({
-                              ...productForm,
-                              images: [...productForm.images, event.target?.result as string],
-                            })
+                        const files = Array.from(e.target.files || [])
+                        files.forEach((file) => {
+                          if (productForm.images.length < 10) {
+                            const reader = new FileReader()
+                            reader.onload = (event) => {
+                              setProductForm({
+                                ...productForm,
+                                images: [...productForm.images, event.target?.result as string],
+                              })
+                            }
+                            reader.readAsDataURL(file)
                           }
-                          reader.readAsDataURL(file)
-                        }
+                        })
                       }}
                       className="w-auto file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
                     />
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-5 gap-2">
                     {productForm.images.map((image, index) => (
                       <div key={index} className="relative">
                         <div className="relative w-full h-20 bg-cream-100 rounded overflow-hidden">
@@ -1306,7 +1333,13 @@ export default function AdminDashboard() {
                         </Button>
                       </div>
                     ))}
+                    {productForm.images.length < 10 && (
+                      <div className="w-full h-20 bg-cream-100 rounded border-2 border-dashed border-cream-300 flex items-center justify-center text-charcoal-800">
+                        <Upload className="h-6 w-6" />
+                      </div>
+                    )}
                   </div>
+                  <p className="text-xs text-charcoal-800 mt-2">{productForm.images.length}/10 images uploaded</p>
                 </div>
 
                 <div className="flex space-x-4">
@@ -1350,237 +1383,18 @@ export default function AdminDashboard() {
             </DialogContent>
           </Dialog>
 
-          {/* User Dialog */}
-          <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{isUserEditMode ? "Edit User" : "Add New User"}</DialogTitle>
-                <DialogDescription>
-                  {isUserEditMode ? "Update user information" : "Create a new user account"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div>
-                  <Label htmlFor="userName">Full Name</Label>
-                  <Input
-                    id="userName"
-                    value={userForm.name}
-                    onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="userEmail">Email</Label>
-                  <Input
-                    id="userEmail"
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="userRole">Role</Label>
-                  <Select value={userForm.role} onValueChange={(value) => setUserForm({ ...userForm, role: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <SaveButton onSave={saveUser}>{isUserEditMode ? "Update User" : "Add User"}</SaveButton>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Order Details Dialog */}
-          <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Order Details</DialogTitle>
-                <DialogDescription>View complete order information</DialogDescription>
-              </DialogHeader>
-              {selectedOrder && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Order ID</Label>
-                      <p className="font-semibold">{selectedOrder.id}</p>
-                    </div>
-                    <div>
-                      <Label>Date</Label>
-                      <p className="font-semibold">{selectedOrder.date}</p>
-                    </div>
-                    <div>
-                      <Label>Status</Label>
-                      <Badge variant={selectedOrder.status === "delivered" ? "default" : "secondary"}>
-                        {selectedOrder.status}
-                      </Badge>
-                    </div>
-                    <div>
-                      <Label>Total</Label>
-                      <p className="font-semibold">${selectedOrder.total.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Customer Information</Label>
-                    <div className="bg-cream-100 p-4 rounded-lg mt-2">
-                      <p>
-                        <strong>Name:</strong> John Doe
-                      </p>
-                      <p>
-                        <strong>Email:</strong> john@example.com
-                      </p>
-                      <p>
-                        <strong>Phone:</strong> +1 (555) 123-4567
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Order Items</Label>
-                    <div className="bg-cream-100 p-4 rounded-lg mt-2">
-                      {selectedOrder.items?.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center py-2 border-b border-cream-200 last:border-b-0"
-                        >
-                          <span>
-                            {item.product?.name || "Product"} x{item.quantity}
-                          </span>
-                          <span>${(item.product?.price * item.quantity || 0).toLocaleString()}</span>
-                        </div>
-                      )) || <p>No items found</p>}
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end">
-                <Button onClick={() => setIsOrderDialogOpen(false)}>Close</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Contact Info Dialog */}
-          <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Contact Information</DialogTitle>
-                <DialogDescription>Update your store's contact information</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={contactForm.email}
-                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    value={contactForm.phone}
-                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="address">Address</Label>
-                  <Textarea
-                    id="address"
-                    value={contactForm.address}
-                    onChange={(e) => setContactForm({ ...contactForm, address: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsContactDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <SaveButton onSave={saveContactInfo}>Save Changes</SaveButton>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Link Dialog */}
-          <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{linkEditMode ? "Edit Link" : "Add New Link"}</DialogTitle>
-                <DialogDescription>
-                  {linkForm.type === "socialMedia"
-                    ? "Manage social media links"
-                    : linkForm.type === "quickLinks"
-                      ? "Manage quick links"
-                      : "Manage customer care links"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div>
-                  <Label htmlFor="linkTitle">{linkForm.type === "socialMedia" ? "Platform" : "Title"}</Label>
-                  {linkForm.type === "socialMedia" ? (
-                    <Select
-                      value={linkForm.title}
-                      onValueChange={(value) => setLinkForm({ ...linkForm, title: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Instagram">Instagram</SelectItem>
-                        <SelectItem value="Facebook">Facebook</SelectItem>
-                        <SelectItem value="Twitter">Twitter</SelectItem>
-                        <SelectItem value="Pinterest">Pinterest</SelectItem>
-                        <SelectItem value="YouTube">YouTube</SelectItem>
-                        <SelectItem value="TikTok">TikTok</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id="linkTitle"
-                      value={linkForm.title}
-                      onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
-                    />
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="linkUrl">URL</Label>
-                  <Input
-                    id="linkUrl"
-                    value={linkForm.url}
-                    onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
-                    placeholder="https://example.com"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <SaveButton onSave={saveLink}>{linkEditMode ? "Update Link" : "Add Link"}</SaveButton>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Home Page Settings Dialog */}
+          {/* Home Page Settings Dialog with Carousel Support */}
           <Dialog open={isHomePageDialogOpen} onOpenChange={setIsHomePageDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Home Page</DialogTitle>
-                <DialogDescription>Customize your home page content and media</DialogDescription>
+                <DialogDescription>Customize your home page content and media carousel</DialogDescription>
               </DialogHeader>
               <div className="grid gap-6 py-4">
-                {/* Hero Section */}
+                {/* Hero Carousel Section */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Hero Section</CardTitle>
+                    <CardTitle>Hero Carousel</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -1604,75 +1418,84 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 mb-4">
-                      <input
-                        type="checkbox"
-                        id="useVideo"
-                        checked={homePageSettings.useVideo}
-                        onChange={(e) => setHomePageSettings({ ...homePageSettings, useVideo: e.target.checked })}
-                      />
-                      <Label htmlFor="useVideo">Use Video Background</Label>
-                    </div>
-
-                    {homePageSettings.useVideo ? (
-                      <div>
-                        <Label htmlFor="heroVideo">Hero Video</Label>
-                        <Input
-                          id="heroVideo"
-                          type="file"
-                          accept="video/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = (event) => {
-                                setHomePageSettings({ ...homePageSettings, heroVideo: event.target?.result as string })
+                    <div>
+                      <div className="flex justify-between items-center mb-4">
+                        <Label>Hero Media (Images & Videos)</Label>
+                        <div className="flex space-x-2">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const reader = new FileReader()
+                                reader.onload = (event) => {
+                                  addHeroMedia("image", event.target?.result as string, file.name)
+                                }
+                                reader.readAsDataURL(file)
                               }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
-                        />
-                        {homePageSettings.heroVideo && (
-                          <div className="mt-2 relative w-full h-32 bg-cream-100 rounded overflow-hidden">
-                            <video
-                              src={homePageSettings.heroVideo}
-                              className="w-full h-full object-cover"
-                              muted
-                              controls
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <Label htmlFor="heroImage">Hero Background Image</Label>
-                        <Input
-                          id="heroImage"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = (event) => {
-                                setHomePageSettings({ ...homePageSettings, heroImage: event.target?.result as string })
+                            }}
+                            className="w-auto file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700"
+                          />
+                          <Input
+                            type="file"
+                            accept="video/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const reader = new FileReader()
+                                reader.onload = (event) => {
+                                  addHeroMedia("video", event.target?.result as string, file.name)
+                                }
+                                reader.readAsDataURL(file)
                               }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
-                        />
-                        <div className="mt-2 relative w-full h-32 bg-cream-100 rounded overflow-hidden">
-                          <Image
-                            src={homePageSettings.heroImage || "/placeholder.svg"}
-                            alt="Hero background"
-                            fill
-                            className="object-cover"
+                            }}
+                            className="w-auto file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700"
                           />
                         </div>
                       </div>
-                    )}
+
+                      <div className="grid grid-cols-3 gap-4">
+                        {homePageSettings.heroMedia?.map((media, index) => (
+                          <div key={index} className="relative">
+                            <div className="relative w-full h-32 bg-cream-100 rounded overflow-hidden">
+                              {media.type === "video" ? (
+                                <video src={media.url} className="w-full h-full object-cover" muted />
+                              ) : (
+                                <Image
+                                  src={media.url || "/placeholder.svg"}
+                                  alt={media.alt || "Hero media"}
+                                  fill
+                                  className="object-cover"
+                                />
+                              )}
+                              <div className="absolute top-2 left-2">
+                                <Badge variant={media.type === "video" ? "default" : "secondary"}>
+                                  {media.type === "video" ? (
+                                    <Video className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <ImageIcon className="h-3 w-3 mr-1" />
+                                  )}
+                                  {media.type}
+                                </Badge>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white rounded-full hover:bg-red-600"
+                              onClick={() => removeHeroMedia(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-charcoal-800">
+                        Upload multiple images and videos for your hero carousel. Each item will display for 4 seconds.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1878,6 +1701,8 @@ export default function AdminDashboard() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Other existing dialogs remain the same... */}
         </div>
       </div>
     </AdminLayout>
