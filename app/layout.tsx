@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Playfair_Display, Inter } from "next/font/google"
 import "./globals.css"
 import Navbar from "@/components/layout/Navbar"
+import FOMOPopup from "@/components/FOMOPopup"
 import { ThemeProvider } from "@/components/providers/ThemeProvider"
 import { WishlistProvider } from "@/components/providers/WishlistProvider"
 import { CartProvider } from "@/components/providers/CartProvider"
@@ -23,7 +24,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "CarryLuxe - Luxury Bags & Accessories",
   description: "Discover timeless luxury bags and accessories from CarryLuxe. Premium quality, elegant design.",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -40,6 +41,7 @@ export default function RootLayout({
               <CartProvider>
                 <Navbar />
                 <main className="min-h-screen">{children}</main>
+                <FOMOPopup />
               </CartProvider>
             </WishlistProvider>
           </AuthProvider>
