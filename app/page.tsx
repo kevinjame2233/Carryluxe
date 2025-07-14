@@ -11,8 +11,30 @@ import { motion } from "framer-motion"
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
 
+interface HomePageSettings {
+  heroTitle: string
+  heroSubtitle: string
+  heroMedia: Array<{
+    type: string
+    url: string
+    alt: string
+  }>
+  hermesTitle: string
+  hermesDescription: string
+  hermesImage: string
+  lvTitle: string
+  lvDescription: string
+  lvImage: string
+  shopByIconTitle: string
+  shopByIconSubtitle: string
+  trendingTitle: string
+  trendingSubtitle: string
+  ctaTitle: string
+  ctaDescription: string
+}
+
 export default function HomePage() {
-  const [homePageContent, setHomePageContent] = useState({
+  const [homePageContent, setHomePageContent] = useState<HomePageSettings>({
     heroTitle: "Elevated Luxury.\nTimeless Icons.",
     heroSubtitle:
       "Discover the world's most coveted handbags from Hermès and Louis Vuitton.\nWhere heritage meets contemporary elegance.",
@@ -39,28 +61,35 @@ export default function HomePage() {
   })
 
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Load saved homepage settings
-    const savedSettings = localStorage.getItem("carryluxe-homepage-settings")
-    if (savedSettings) {
+    // Load homepage settings from API
+    const loadHomePageSettings = async () => {
       try {
-        const parsed = JSON.parse(savedSettings)
-        setHomePageContent(parsed)
-      } catch (e) {
-        console.error("Failed to parse homepage settings", e)
+        const response = await fetch("/api/homepage-settings")
+        if (response.ok) {
+          const settings = await response.json()
+          setHomePageContent(settings)
+        }
+      } catch (error) {
+        console.error("Failed to load homepage settings:", error)
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    // Listen for homepage settings updates
-    const handleSettingsUpdate = (event) => {
+    loadHomePageSettings()
+
+    // Listen for homepage settings updates from admin
+    const handleSettingsUpdate = (event: CustomEvent) => {
       setHomePageContent(event.detail)
     }
 
-    window.addEventListener("homepageSettingsUpdated", handleSettingsUpdate)
+    window.addEventListener("homepageSettingsUpdated", handleSettingsUpdate as EventListener)
 
     return () => {
-      window.removeEventListener("homepageSettingsUpdated", handleSettingsUpdate)
+      window.removeEventListener("homepageSettingsUpdated", handleSettingsUpdate as EventListener)
     }
   }, [])
 
@@ -110,6 +139,17 @@ export default function HomePage() {
   }
 
   const currentMedia = homePageContent.heroMedia?.[currentMediaIndex] || homePageContent.heroMedia?.[0]
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gold-400 mx-auto mb-4"></div>
+          <p className="text-charcoal-800">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen">
@@ -211,7 +251,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white text-white hover:bg-white hover:text-charcoal-900 font-semibold px-8 py-3 text-lg"
+                className="border-white text-white hover:bg-white hover:text-charcoal-900 font-semibold px-8 py-3 text-lg bg-transparent"
               >
                 Shop Louis Vuitton
               </Button>
@@ -258,7 +298,7 @@ export default function HomePage() {
                   <Link href="/products?category=Hermès">
                     <Button
                       variant="outline"
-                      className="border-white text-white hover:bg-white hover:text-charcoal-900"
+                      className="border-white text-white hover:bg-white hover:text-charcoal-900 bg-transparent"
                     >
                       Explore Collection
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -291,7 +331,7 @@ export default function HomePage() {
                   <Link href="/products?category=Louis Vuitton">
                     <Button
                       variant="outline"
-                      className="border-white text-white hover:bg-white hover:text-charcoal-900"
+                      className="border-white text-white hover:bg-white hover:text-charcoal-900 bg-transparent"
                     >
                       Explore Collection
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -380,7 +420,7 @@ export default function HomePage() {
             <Button
               size="lg"
               variant="outline"
-              className="border-charcoal-900 text-charcoal-900 hover:bg-charcoal-900 hover:text-white"
+              className="border-charcoal-900 text-charcoal-900 hover:bg-charcoal-900 hover:text-white bg-transparent"
             >
               View All Collections
             </Button>

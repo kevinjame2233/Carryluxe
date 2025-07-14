@@ -66,6 +66,28 @@ const initialSettings = {
   ],
 }
 
+interface HomePageSettings {
+  heroTitle: string
+  heroSubtitle: string
+  heroMedia: Array<{
+    type: string
+    url: string
+    alt: string
+  }>
+  hermesTitle: string
+  hermesDescription: string
+  hermesImage: string
+  lvTitle: string
+  lvDescription: string
+  lvImage: string
+  shopByIconTitle: string
+  shopByIconSubtitle: string
+  trendingTitle: string
+  trendingSubtitle: string
+  ctaTitle: string
+  ctaDescription: string
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth()
   const router = useRouter()
@@ -120,7 +142,7 @@ export default function AdminDashboard() {
 
   // Home page settings state
   const [isHomePageDialogOpen, setIsHomePageDialogOpen] = useState(false)
-  const [homePageSettings, setHomePageSettings] = useState({
+  const [homePageSettings, setHomePageSettings] = useState<HomePageSettings>({
     heroTitle: "Elevated Luxury.\nTimeless Icons.",
     heroSubtitle:
       "Discover the world's most coveted handbags from Hermès and Louis Vuitton.\nWhere heritage meets contemporary elegance.",
@@ -150,16 +172,24 @@ export default function AdminDashboard() {
   useEffect(() => {
     setIsClient(true)
 
-    // Only run localStorage operations on client side
+    // Load homepage settings from API
+    const loadHomePageSettings = async () => {
+      try {
+        const response = await fetch("/api/homepage-settings")
+        if (response.ok) {
+          const settings = await response.json()
+          setHomePageSettings(settings)
+        }
+      } catch (error) {
+        console.error("Failed to load homepage settings:", error)
+      }
+    }
+
+    loadHomePageSettings()
+
+    // Only run localStorage operations on client side for other settings
     if (typeof window !== "undefined") {
       try {
-        // Load saved homepage settings
-        const savedHomepage = localStorage.getItem("carryluxe-homepage-settings")
-        if (savedHomepage) {
-          const parsed = JSON.parse(savedHomepage)
-          setHomePageSettings(parsed)
-        }
-
         // Load saved site settings
         const savedSiteSettings = localStorage.getItem("carryluxe-site-settings")
         if (savedSiteSettings) {
@@ -460,26 +490,29 @@ export default function AdminDashboard() {
         throw new Error("Hero title and subtitle are required")
       }
 
-      // Ensure we're on the client side
-      if (typeof window === "undefined") {
-        throw new Error("Cannot save settings on server side")
+      // Save to database via API
+      const response = await fetch("/api/homepage-settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(homePageSettings),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save homepage settings")
       }
 
-      // Save to localStorage with error handling
-      const settingsString = JSON.stringify(homePageSettings)
-      localStorage.setItem("carryluxe-homepage-settings", settingsString)
-
-      // Verify the save was successful
-      const savedSettings = localStorage.getItem("carryluxe-homepage-settings")
-      if (!savedSettings) {
-        throw new Error("Failed to save to localStorage")
-      }
+      const result = await response.json()
 
       // Trigger a custom event to notify other components of the change
-      const event = new CustomEvent("homepageSettingsUpdated", {
-        detail: homePageSettings,
-      })
-      window.dispatchEvent(event)
+      if (typeof window !== "undefined") {
+        const event = new CustomEvent("homepageSettingsUpdated", {
+          detail: homePageSettings,
+        })
+        window.dispatchEvent(event)
+      }
 
       setIsHomePageDialogOpen(false)
 
@@ -1446,12 +1479,14 @@ export default function AdminDashboard() {
             </DialogContent>
           </Dialog>
 
-          {/* Home Page Settings Dialog with Carousel Support */}
+          {/* Home Page Settings Dialog with Database Storage */}
           <Dialog open={isHomePageDialogOpen} onOpenChange={setIsHomePageDialogOpen}>
             <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Home Page</DialogTitle>
-                <DialogDescription>Customize your home page content and media carousel</DialogDescription>
+                <DialogDescription>
+                  Customize your home page content and media carousel (stored in database)
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-6 py-4">
                 {/* Hero Carousel Section */}
