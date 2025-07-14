@@ -73,6 +73,7 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState(initialProducts)
   const [users, setUsers] = useState(initialUsers)
   const [siteSettings, setSiteSettings] = useState(initialSettings)
+  const [isClient, setIsClient] = useState(false)
 
   // Product management state
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -147,23 +148,26 @@ export default function AdminDashboard() {
 
   // Load saved settings on component mount
   useEffect(() => {
-    // Load saved homepage settings
-    const savedHomepage = localStorage.getItem("carryluxe-homepage-settings")
-    if (savedHomepage) {
-      try {
-        setHomePageSettings(JSON.parse(savedHomepage))
-      } catch (e) {
-        console.error("Failed to parse homepage settings", e)
-      }
-    }
+    setIsClient(true)
 
-    // Load saved site settings
-    const savedSiteSettings = localStorage.getItem("carryluxe-site-settings")
-    if (savedSiteSettings) {
+    // Only run localStorage operations on client side
+    if (typeof window !== "undefined") {
       try {
-        setSiteSettings(JSON.parse(savedSiteSettings))
+        // Load saved homepage settings
+        const savedHomepage = localStorage.getItem("carryluxe-homepage-settings")
+        if (savedHomepage) {
+          const parsed = JSON.parse(savedHomepage)
+          setHomePageSettings(parsed)
+        }
+
+        // Load saved site settings
+        const savedSiteSettings = localStorage.getItem("carryluxe-site-settings")
+        if (savedSiteSettings) {
+          const parsed = JSON.parse(savedSiteSettings)
+          setSiteSettings(parsed)
+        }
       } catch (e) {
-        console.error("Failed to parse site settings", e)
+        console.error("Failed to parse saved settings", e)
       }
     }
   }, [])
@@ -172,6 +176,11 @@ export default function AdminDashboard() {
   if (!user || user.role !== "admin") {
     router.push("/")
     return null
+  }
+
+  // Don't render until client-side hydration is complete
+  if (!isClient) {
+    return <div>Loading...</div>
   }
 
   // Mock KPI data
@@ -219,39 +228,48 @@ export default function AdminDashboard() {
   }
 
   const saveProduct = async () => {
-    const newProduct = {
-      id: isEditMode ? selectedProduct.id : `product-${Date.now()}`,
-      name: productForm.name,
-      price: Number.parseFloat(productForm.price),
-      image: productForm.image,
-      images: productForm.images.length > 0 ? productForm.images : [productForm.image],
-      description: productForm.description,
-      category: productForm.category,
-      colors: productForm.colors.split(",").map((c) => c.trim()),
-      inStock: productForm.inStock,
-      featured: productForm.featured,
-      newArrival: productForm.newArrival,
+    try {
+      const newProduct = {
+        id: isEditMode ? selectedProduct.id : `product-${Date.now()}`,
+        name: productForm.name,
+        price: Number.parseFloat(productForm.price),
+        image: productForm.image,
+        images: productForm.images.length > 0 ? productForm.images : [productForm.image],
+        description: productForm.description,
+        category: productForm.category,
+        colors: productForm.colors.split(",").map((c) => c.trim()),
+        inStock: productForm.inStock,
+        featured: productForm.featured,
+        newArrival: productForm.newArrival,
+      }
+
+      if (isEditMode) {
+        setProducts(products.map((p) => (p.id === selectedProduct.id ? newProduct : p)))
+      } else {
+        setProducts([...products, newProduct])
+      }
+
+      // Save to localStorage
+      const updatedProducts = isEditMode
+        ? products.map((p) => (p.id === selectedProduct.id ? newProduct : p))
+        : [...products, newProduct]
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("carryluxe-products", JSON.stringify(updatedProducts))
+      }
+      setIsProductDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to save product:", error)
+      throw error
     }
-
-    if (isEditMode) {
-      setProducts(products.map((p) => (p.id === selectedProduct.id ? newProduct : p)))
-    } else {
-      setProducts([...products, newProduct])
-    }
-
-    // Save to localStorage
-    const updatedProducts = isEditMode
-      ? products.map((p) => (p.id === selectedProduct.id ? newProduct : p))
-      : [...products, newProduct]
-
-    localStorage.setItem("carryluxe-products", JSON.stringify(updatedProducts))
-    setIsProductDialogOpen(false)
   }
 
   const deleteProduct = (productId) => {
     const updatedProducts = products.filter((p) => p.id !== productId)
     setProducts(updatedProducts)
-    localStorage.setItem("carryluxe-products", JSON.stringify(updatedProducts))
+    if (typeof window !== "undefined") {
+      localStorage.setItem("carryluxe-products", JSON.stringify(updatedProducts))
+    }
   }
 
   const removeProductImage = (index) => {
@@ -283,26 +301,35 @@ export default function AdminDashboard() {
   }
 
   const saveUser = async () => {
-    const newUser = {
-      id: isUserEditMode ? selectedUser.id : `user-${Date.now()}`,
-      name: userForm.name,
-      email: userForm.email,
-      role: userForm.role,
+    try {
+      const newUser = {
+        id: isUserEditMode ? selectedUser.id : `user-${Date.now()}`,
+        name: userForm.name,
+        email: userForm.email,
+        role: userForm.role,
+      }
+
+      const updatedUsers = isUserEditMode
+        ? users.map((u) => (u.id === selectedUser.id ? newUser : u))
+        : [...users, newUser]
+
+      setUsers(updatedUsers)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("carryluxe-users", JSON.stringify(updatedUsers))
+      }
+      setIsUserDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to save user:", error)
+      throw error
     }
-
-    const updatedUsers = isUserEditMode
-      ? users.map((u) => (u.id === selectedUser.id ? newUser : u))
-      : [...users, newUser]
-
-    setUsers(updatedUsers)
-    localStorage.setItem("carryluxe-users", JSON.stringify(updatedUsers))
-    setIsUserDialogOpen(false)
   }
 
   const deleteUser = (userId) => {
     const updatedUsers = users.filter((u) => u.id !== userId)
     setUsers(updatedUsers)
-    localStorage.setItem("carryluxe-users", JSON.stringify(updatedUsers))
+    if (typeof window !== "undefined") {
+      localStorage.setItem("carryluxe-users", JSON.stringify(updatedUsers))
+    }
   }
 
   // Order details function
@@ -318,21 +345,29 @@ export default function AdminDashboard() {
   }
 
   const saveContactInfo = async () => {
-    const updatedSettings = {
-      ...siteSettings,
-      contactInfo: contactForm,
+    try {
+      const updatedSettings = {
+        ...siteSettings,
+        contactInfo: contactForm,
+      }
+      setSiteSettings(updatedSettings)
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("carryluxe-site-settings", JSON.stringify(updatedSettings))
+
+        // Also trigger footer update
+        window.dispatchEvent(
+          new CustomEvent("siteSettingsUpdated", {
+            detail: updatedSettings,
+          }),
+        )
+      }
+
+      setIsContactDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to save contact info:", error)
+      throw error
     }
-    setSiteSettings(updatedSettings)
-    localStorage.setItem("carryluxe-site-settings", JSON.stringify(updatedSettings))
-
-    // Also trigger footer update
-    window.dispatchEvent(
-      new CustomEvent("siteSettingsUpdated", {
-        detail: updatedSettings,
-      }),
-    )
-
-    setIsContactDialogOpen(false)
   }
 
   // Link management
@@ -358,48 +393,59 @@ export default function AdminDashboard() {
   }
 
   const saveLink = async () => {
-    const newLink = {
-      id: linkEditMode ? linkForm.id : `link-${Date.now()}`,
-      title: linkForm.title,
-      url: linkForm.url,
-      ...(linkForm.type === "socialMedia" ? { platform: linkForm.title } : {}),
+    try {
+      const newLink = {
+        id: linkEditMode ? linkForm.id : `link-${Date.now()}`,
+        title: linkForm.title,
+        url: linkForm.url,
+        ...(linkForm.type === "socialMedia" ? { platform: linkForm.title } : {}),
+      }
+
+      const updatedSettings = { ...siteSettings }
+
+      if (linkEditMode) {
+        updatedSettings[linkForm.type] = updatedSettings[linkForm.type].map((link) =>
+          link.id === newLink.id ? newLink : link,
+        )
+      } else {
+        updatedSettings[linkForm.type] = [...updatedSettings[linkForm.type], newLink]
+      }
+
+      setSiteSettings(updatedSettings)
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("carryluxe-site-settings", JSON.stringify(updatedSettings))
+
+        // Trigger footer update
+        window.dispatchEvent(
+          new CustomEvent("siteSettingsUpdated", {
+            detail: updatedSettings,
+          }),
+        )
+      }
+
+      setIsLinkDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to save link:", error)
+      throw error
     }
-
-    const updatedSettings = { ...siteSettings }
-
-    if (linkEditMode) {
-      updatedSettings[linkForm.type] = updatedSettings[linkForm.type].map((link) =>
-        link.id === newLink.id ? newLink : link,
-      )
-    } else {
-      updatedSettings[linkForm.type] = [...updatedSettings[linkForm.type], newLink]
-    }
-
-    setSiteSettings(updatedSettings)
-    localStorage.setItem("carryluxe-site-settings", JSON.stringify(updatedSettings))
-
-    // Trigger footer update
-    window.dispatchEvent(
-      new CustomEvent("siteSettingsUpdated", {
-        detail: updatedSettings,
-      }),
-    )
-
-    setIsLinkDialogOpen(false)
   }
 
   const deleteLink = (id, type) => {
     const updatedSettings = { ...siteSettings }
     updatedSettings[type] = updatedSettings[type].filter((link) => link.id !== id)
     setSiteSettings(updatedSettings)
-    localStorage.setItem("carryluxe-site-settings", JSON.stringify(updatedSettings))
 
-    // Trigger footer update
-    window.dispatchEvent(
-      new CustomEvent("siteSettingsUpdated", {
-        detail: updatedSettings,
-      }),
-    )
+    if (typeof window !== "undefined") {
+      localStorage.setItem("carryluxe-site-settings", JSON.stringify(updatedSettings))
+
+      // Trigger footer update
+      window.dispatchEvent(
+        new CustomEvent("siteSettingsUpdated", {
+          detail: updatedSettings,
+        }),
+      )
+    }
   }
 
   // Home page management functions
@@ -409,25 +455,42 @@ export default function AdminDashboard() {
 
   const saveHomePageSettings = async () => {
     try {
-      // Save to localStorage
-      localStorage.setItem("carryluxe-homepage-settings", JSON.stringify(homePageSettings))
+      // Validate required fields
+      if (!homePageSettings.heroTitle || !homePageSettings.heroSubtitle) {
+        throw new Error("Hero title and subtitle are required")
+      }
+
+      // Ensure we're on the client side
+      if (typeof window === "undefined") {
+        throw new Error("Cannot save settings on server side")
+      }
+
+      // Save to localStorage with error handling
+      const settingsString = JSON.stringify(homePageSettings)
+      localStorage.setItem("carryluxe-homepage-settings", settingsString)
+
+      // Verify the save was successful
+      const savedSettings = localStorage.getItem("carryluxe-homepage-settings")
+      if (!savedSettings) {
+        throw new Error("Failed to save to localStorage")
+      }
 
       // Trigger a custom event to notify other components of the change
-      window.dispatchEvent(
-        new CustomEvent("homepageSettingsUpdated", {
-          detail: homePageSettings,
-        }),
-      )
+      const event = new CustomEvent("homepageSettingsUpdated", {
+        detail: homePageSettings,
+      })
+      window.dispatchEvent(event)
 
       setIsHomePageDialogOpen(false)
 
-      // Show success message
+      // Show success message after a brief delay
       setTimeout(() => {
-        alert("Home page settings saved successfully! The changes will be visible on the home page.")
+        alert("Home page settings saved successfully! The changes are now visible on the home page.")
       }, 100)
     } catch (error) {
       console.error("Failed to save homepage settings:", error)
-      alert("Failed to save homepage settings. Please try again.")
+      alert(`Failed to save homepage settings: ${error.message}. Please try again.`)
+      throw error
     }
   }
 
@@ -1702,7 +1765,182 @@ export default function AdminDashboard() {
             </DialogContent>
           </Dialog>
 
-          {/* Other existing dialogs remain the same... */}
+          {/* Contact Dialog */}
+          <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Contact Information</DialogTitle>
+                <DialogDescription>Update your store's contact details</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div>
+                  <Label htmlFor="contactEmail">Email</Label>
+                  <Input
+                    id="contactEmail"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contactPhone">Phone</Label>
+                  <Input
+                    id="contactPhone"
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contactAddress">Address</Label>
+                  <Textarea
+                    id="contactAddress"
+                    value={contactForm.address}
+                    onChange={(e) => setContactForm({ ...contactForm, address: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsContactDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <SaveButton onSave={saveContactInfo}>Save Changes</SaveButton>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Link Dialog */}
+          <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{linkEditMode ? "Edit Link" : "Add New Link"}</DialogTitle>
+                <DialogDescription>
+                  {linkEditMode ? "Update link information" : "Add a new link to your site"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div>
+                  <Label htmlFor="linkTitle">Title</Label>
+                  <Input
+                    id="linkTitle"
+                    value={linkForm.title}
+                    onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="linkUrl">URL</Label>
+                  <Input
+                    id="linkUrl"
+                    value={linkForm.url}
+                    onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <SaveButton onSave={saveLink}>{linkEditMode ? "Update Link" : "Add Link"}</SaveButton>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* User Dialog */}
+          <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{isUserEditMode ? "Edit User" : "Add New User"}</DialogTitle>
+                <DialogDescription>
+                  {isUserEditMode ? "Update user information" : "Create a new user account"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div>
+                  <Label htmlFor="userName">Name</Label>
+                  <Input
+                    id="userName"
+                    value={userForm.name}
+                    onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="userEmail">Email</Label>
+                  <Input
+                    id="userEmail"
+                    type="email"
+                    value={userForm.email}
+                    onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="userRole">Role</Label>
+                  <Select value={userForm.role} onValueChange={(value) => setUserForm({ ...userForm, role: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <SaveButton onSave={saveUser}>{isUserEditMode ? "Update User" : "Add User"}</SaveButton>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Order Details Dialog */}
+          <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Order Details</DialogTitle>
+                <DialogDescription>View complete order information</DialogDescription>
+              </DialogHeader>
+              {selectedOrder && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Order ID</Label>
+                      <p className="font-semibold">{selectedOrder.id}</p>
+                    </div>
+                    <div>
+                      <Label>Date</Label>
+                      <p>{selectedOrder.date}</p>
+                    </div>
+                    <div>
+                      <Label>Status</Label>
+                      <Badge
+                        variant={
+                          selectedOrder.status === "delivered"
+                            ? "default"
+                            : selectedOrder.status === "shipped"
+                              ? "secondary"
+                              : "outline"
+                        }
+                      >
+                        {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label>Total</Label>
+                      <p className="font-semibold">${selectedOrder.total.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Customer</Label>
+                    <p>John Doe</p>
+                    <p className="text-sm text-charcoal-800">john.doe@example.com</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button onClick={() => setIsOrderDialogOpen(false)}>Close</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </AdminLayout>
