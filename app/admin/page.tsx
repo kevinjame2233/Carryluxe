@@ -28,9 +28,9 @@ import {
   Facebook,
   Twitter,
   X,
-  Upload,
   ImageIcon,
   Video,
+  Cloud,
 } from "lucide-react"
 import { products as initialProducts, orders, users as initialUsers } from "@/lib/data"
 import { motion } from "framer-motion"
@@ -39,6 +39,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import AdminLayout from "@/components/admin/AdminLayout"
 import SaveButton from "@/components/admin/SaveButton"
+import CloudImageUpload from "@/components/admin/CloudImageUpload"
 
 // Initial site settings
 const initialSettings = {
@@ -527,13 +528,39 @@ export default function AdminDashboard() {
     }
   }
 
-  // Hero media management
-  const addHeroMedia = (type, url, alt = "") => {
-    const newMedia = { type, url, alt }
-    setHomePageSettings({
-      ...homePageSettings,
-      heroMedia: [...(homePageSettings.heroMedia || []), newMedia],
-    })
+  // Hero media management with cloud upload
+  const addHeroMediaFromUpload = async (file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Upload failed")
+      }
+
+      const result = await response.json()
+      const mediaType = file.type.startsWith("video/") ? "video" : "image"
+
+      const newMedia = {
+        type: mediaType,
+        url: result.url,
+        alt: file.name,
+      }
+
+      setHomePageSettings({
+        ...homePageSettings,
+        heroMedia: [...(homePageSettings.heroMedia || []), newMedia],
+      })
+    } catch (error) {
+      console.error("Upload error:", error)
+      alert(`Upload failed: ${error.message}`)
+    }
   }
 
   const removeHeroMedia = (index) => {
@@ -994,7 +1021,13 @@ export default function AdminDashboard() {
             <TabsContent value="homepage" className="space-y-6">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold">Home Page Settings</h2>
+                  <div>
+                    <h2 className="text-2xl font-bold">Home Page Settings</h2>
+                    <p className="text-sm text-charcoal-600 flex items-center gap-1 mt-1">
+                      <Cloud className="h-4 w-4" />
+                      Images stored in Vercel Blob cloud storage
+                    </p>
+                  </div>
                   <Button className="bg-charcoal-900 hover:bg-charcoal-800" onClick={openHomePageDialog}>
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Home Page
@@ -1022,6 +1055,12 @@ export default function AdminDashboard() {
                           )}
                           <div className="absolute top-2 right-2">
                             <Badge variant={media.type === "video" ? "default" : "secondary"}>{media.type}</Badge>
+                          </div>
+                          <div className="absolute bottom-2 left-2">
+                            <Badge variant="outline" className="bg-white/80 text-xs">
+                              <Cloud className="h-3 w-3 mr-1" />
+                              Cloud
+                            </Badge>
                           </div>
                         </div>
                       )) || (
@@ -1288,7 +1327,7 @@ export default function AdminDashboard() {
             </TabsContent>
           </Tabs>
 
-          {/* Product Dialog with Enhanced Image Upload */}
+          {/* Product Dialog with Cloud Image Upload */}
           <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
@@ -1352,91 +1391,12 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="mainImage">Main Product Image</Label>
-                  <Input
-                    id="mainImage"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        const reader = new FileReader()
-                        reader.onload = (event) => {
-                          setProductForm({ ...productForm, image: event.target?.result as string })
-                        }
-                        reader.readAsDataURL(file)
-                      }
-                    }}
-                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
-                  />
-                  {productForm.image && (
-                    <div className="mt-2 relative w-20 h-20 bg-cream-100 rounded overflow-hidden">
-                      <Image
-                        src={productForm.image || "/placeholder.svg"}
-                        alt="Main product image"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <Label>Product Gallery (Up to 10 images)</Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || [])
-                        files.forEach((file) => {
-                          if (productForm.images.length < 10) {
-                            const reader = new FileReader()
-                            reader.onload = (event) => {
-                              setProductForm({
-                                ...productForm,
-                                images: [...productForm.images, event.target?.result as string],
-                              })
-                            }
-                            reader.readAsDataURL(file)
-                          }
-                        })
-                      }}
-                      className="w-auto file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
-                    />
-                  </div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {productForm.images.map((image, index) => (
-                      <div key={index} className="relative">
-                        <div className="relative w-full h-20 bg-cream-100 rounded overflow-hidden">
-                          <Image
-                            src={image || "/placeholder.svg"}
-                            alt={`Product image ${index + 1}`}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white rounded-full hover:bg-red-600"
-                          onClick={() => removeProductImage(index)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                    {productForm.images.length < 10 && (
-                      <div className="w-full h-20 bg-cream-100 rounded border-2 border-dashed border-cream-300 flex items-center justify-center text-charcoal-800">
-                        <Upload className="h-6 w-6" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-charcoal-800 mt-2">{productForm.images.length}/10 images uploaded</p>
-                </div>
+                <CloudImageUpload
+                  label="Main Product Image"
+                  value={productForm.image}
+                  onChange={(url) => setProductForm({ ...productForm, image: url })}
+                  type="image"
+                />
 
                 <div className="flex space-x-4">
                   <div className="flex items-center space-x-2">
@@ -1479,13 +1439,16 @@ export default function AdminDashboard() {
             </DialogContent>
           </Dialog>
 
-          {/* Home Page Settings Dialog with Database Storage */}
+          {/* Home Page Settings Dialog with Cloud Upload */}
           <Dialog open={isHomePageDialogOpen} onOpenChange={setIsHomePageDialogOpen}>
             <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Edit Home Page</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Cloud className="h-5 w-5" />
+                  Edit Home Page
+                </DialogTitle>
                 <DialogDescription>
-                  Customize your home page content and media carousel (stored in database)
+                  Customize your home page content with cloud-hosted media (Vercel Blob storage)
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-6 py-4">
@@ -1522,33 +1485,14 @@ export default function AdminDashboard() {
                         <div className="flex space-x-2">
                           <Input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,video/*"
                             onChange={(e) => {
                               const file = e.target.files?.[0]
                               if (file) {
-                                const reader = new FileReader()
-                                reader.onload = (event) => {
-                                  addHeroMedia("image", event.target?.result as string, file.name)
-                                }
-                                reader.readAsDataURL(file)
+                                addHeroMediaFromUpload(file)
                               }
                             }}
                             className="w-auto file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700"
-                          />
-                          <Input
-                            type="file"
-                            accept="video/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) {
-                                const reader = new FileReader()
-                                reader.onload = (event) => {
-                                  addHeroMedia("video", event.target?.result as string, file.name)
-                                }
-                                reader.readAsDataURL(file)
-                              }
-                            }}
-                            className="w-auto file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700"
                           />
                         </div>
                       </div>
@@ -1577,6 +1521,12 @@ export default function AdminDashboard() {
                                   {media.type}
                                 </Badge>
                               </div>
+                              <div className="absolute bottom-2 left-2">
+                                <Badge variant="outline" className="bg-white/80 text-xs">
+                                  <Cloud className="h-3 w-3 mr-1" />
+                                  Cloud
+                                </Badge>
+                              </div>
                             </div>
                             <Button
                               type="button"
@@ -1591,7 +1541,8 @@ export default function AdminDashboard() {
                         ))}
                       </div>
                       <p className="text-xs text-charcoal-800">
-                        Upload multiple images and videos for your hero carousel. Each item will display for 4 seconds.
+                        Upload multiple images and videos for your hero carousel. Files are stored in Vercel Blob cloud
+                        storage.
                       </p>
                     </div>
                   </CardContent>
@@ -1622,36 +1573,12 @@ export default function AdminDashboard() {
                           }
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="hermesImage">Hermès Collection Image</Label>
-                        <Input
-                          id="hermesImage"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = (event) => {
-                                setHomePageSettings({
-                                  ...homePageSettings,
-                                  hermesImage: event.target?.result as string,
-                                })
-                              }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
-                        />
-                        <div className="mt-2 relative w-full h-24 bg-cream-100 rounded overflow-hidden">
-                          <Image
-                            src={homePageSettings.hermesImage || "/placeholder.svg"}
-                            alt="Hermès collection"
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      </div>
+                      <CloudImageUpload
+                        label="Hermès Collection Image"
+                        value={homePageSettings.hermesImage}
+                        onChange={(url) => setHomePageSettings({ ...homePageSettings, hermesImage: url })}
+                        type="image"
+                      />
                     </CardContent>
                   </Card>
 
@@ -1676,33 +1603,12 @@ export default function AdminDashboard() {
                           onChange={(e) => setHomePageSettings({ ...homePageSettings, lvDescription: e.target.value })}
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="lvImage">Louis Vuitton Collection Image</Label>
-                        <Input
-                          id="lvImage"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = (event) => {
-                                setHomePageSettings({ ...homePageSettings, lvImage: event.target?.result as string })
-                              }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gold-50 file:text-gold-700 hover:file:bg-gold-100"
-                        />
-                        <div className="mt-2 relative w-full h-24 bg-cream-100 rounded overflow-hidden">
-                          <Image
-                            src={homePageSettings.lvImage || "/placeholder.svg"}
-                            alt="Louis Vuitton collection"
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      </div>
+                      <CloudImageUpload
+                        label="Louis Vuitton Collection Image"
+                        value={homePageSettings.lvImage}
+                        onChange={(url) => setHomePageSettings({ ...homePageSettings, lvImage: url })}
+                        type="image"
+                      />
                     </CardContent>
                   </Card>
                 </div>

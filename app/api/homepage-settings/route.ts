@@ -118,6 +118,33 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Hero title and subtitle are required" }, { status: 400 })
     }
 
+    // Validate hero media URLs (ensure they're not base64 data)
+    if (heroMedia && Array.isArray(heroMedia)) {
+      for (const media of heroMedia) {
+        if (media.url && media.url.startsWith("data:")) {
+          return NextResponse.json(
+            {
+              error: "Base64 data URLs are not allowed. Please upload images to cloud storage first.",
+            },
+            { status: 400 },
+          )
+        }
+      }
+    }
+
+    // Validate image URLs (ensure they're not base64 data)
+    const imageFields = [hermesImage, lvImage]
+    for (const imageUrl of imageFields) {
+      if (imageUrl && imageUrl.startsWith("data:")) {
+        return NextResponse.json(
+          {
+            error: "Base64 data URLs are not allowed. Please upload images to cloud storage first.",
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     // Check if settings exist
     const existingSettings = await sql`
       SELECT id FROM homepage_settings ORDER BY id DESC LIMIT 1
