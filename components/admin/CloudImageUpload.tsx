@@ -27,7 +27,7 @@ export default function CloudImageUpload({
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { user, getAuthToken } = useAuth()
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -44,6 +44,14 @@ export default function CloudImageUpload({
         throw new Error("Admin authentication required")
       }
 
+      // Get auth token
+      const token = getAuthToken()
+      if (!token) {
+        throw new Error("No authentication token found. Please log in again.")
+      }
+
+      console.log("Starting upload with token:", token.substring(0, 20) + "...")
+
       const formData = new FormData()
       formData.append("file", file)
 
@@ -52,20 +60,8 @@ export default function CloudImageUpload({
         setUploadProgress((prev) => Math.min(prev + 10, 90))
       }, 200)
 
-      // Get auth token from localStorage or cookie
-      let token = null
-      if (typeof window !== "undefined") {
-        token =
-          localStorage.getItem("auth-token") ||
-          document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("auth-token="))
-            ?.split("=")[1]
-      }
-
-      const headers: HeadersInit = {}
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
       }
 
       console.log("Uploading file:", file.name, "Size:", file.size, "Type:", file.type)
@@ -82,6 +78,7 @@ export default function CloudImageUpload({
 
       if (!response.ok) {
         const errorData = await response.json()
+        console.error("Upload failed:", errorData)
         throw new Error(errorData.error || `Upload failed with status ${response.status}`)
       }
 
@@ -147,6 +144,19 @@ export default function CloudImageUpload({
     }
   }
 
+  // Show login prompt if not authenticated
+  if (!user || user.role !== "admin") {
+    return (
+      <div className="space-y-3">
+        {label && <Label>{label}</Label>}
+        <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm">Please log in as admin to upload files.</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       {label && <Label>{label}</Label>}
@@ -180,6 +190,10 @@ export default function CloudImageUpload({
                   </>
                 )}
               </div>
+            </div>
+            {/* Cloud storage indicator */}
+            <div className="absolute top-2 right-2">
+              <div className="bg-blue-500/80 text-white px-2 py-1 rounded text-xs">☁️ Cloud</div>
             </div>
           </div>
           <Button

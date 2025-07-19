@@ -32,6 +32,7 @@ interface AuthContextType {
   }) => Promise<{ success: boolean; error?: string }>
   updatePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>
   loading: boolean
+  getAuthToken: () => string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -44,15 +45,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth()
   }, [])
 
+  const generateToken = (user: User): string => {
+    // Simple token generation for demo - in production use proper JWT
+    const tokenData = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+    }
+    return btoa(JSON.stringify(tokenData))
+  }
+
+  const getAuthToken = (): string | null => {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem("carryluxe-auth-token")
+  }
+
+  const setAuthToken = (token: string) => {
+    if (typeof window === "undefined") return
+    localStorage.setItem("carryluxe-auth-token", token)
+    // Also set as cookie for server-side access
+    document.cookie = `auth-token=${token}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`
+  }
+
+  const clearAuthToken = () => {
+    if (typeof window === "undefined") return
+    localStorage.removeItem("carryluxe-auth-token")
+    localStorage.removeItem("carryluxe-user")
+    // Clear cookie
+    document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  }
+
   const checkAuth = async () => {
     try {
-      // Check localStorage for demo user
+      // Check localStorage for demo user and token
       const savedUser = localStorage.getItem("carryluxe-user")
-      if (savedUser) {
-        setUser(JSON.parse(savedUser))
+      const savedToken = localStorage.getItem("carryluxe-auth-token")
+
+      if (savedUser && savedToken) {
+        const userData = JSON.parse(savedUser)
+        // Verify token is not expired
+        try {
+          const tokenData = JSON.parse(atob(savedToken))
+          if (tokenData.exp > Date.now()) {
+            setUser(userData)
+            // Ensure cookie is set
+            setAuthToken(savedToken)
+          } else {
+            // Token expired, clear everything
+            clearAuthToken()
+          }
+        } catch {
+          // Invalid token, clear everything
+          clearAuthToken()
+        }
       }
     } catch (error) {
       console.error("Auth check error:", error)
+      clearAuthToken()
     } finally {
       setLoading(false)
     }
@@ -72,8 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: "admin",
           createdAt: new Date().toISOString(),
         }
+
+        const token = generateToken(adminUser)
+
         setUser(adminUser)
         localStorage.setItem("carryluxe-user", JSON.stringify(adminUser))
+        setAuthToken(token)
+
+        console.log("Admin login successful, token set:", token.substring(0, 20) + "...")
         return { success: true }
       } else if (email === "customer@example.com" && password === "admin123") {
         const customerUser: User = {
@@ -85,8 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: "customer",
           createdAt: new Date().toISOString(),
         }
+
+        const token = generateToken(customerUser)
+
         setUser(customerUser)
         localStorage.setItem("carryluxe-user", JSON.stringify(customerUser))
+        setAuthToken(token)
+
         return { success: true }
       } else {
         return { success: false, error: "Invalid credentials" }
@@ -110,8 +171,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: "customer",
         createdAt: new Date().toISOString(),
       }
+
+      const token = generateToken(newUser)
+
       setUser(newUser)
       localStorage.setItem("carryluxe-user", JSON.stringify(newUser))
+      setAuthToken(token)
+
       return { success: true }
     } catch (error) {
       return { success: false, error: "Registration failed" }
@@ -136,8 +202,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: profileData.email,
           phone: profileData.phone,
         }
+
+        const token = generateToken(updatedUser)
+
         setUser(updatedUser)
         localStorage.setItem("carryluxe-user", JSON.stringify(updatedUser))
+        setAuthToken(token)
       }
       return { success: true }
     } catch (error) {
@@ -163,14 +233,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       setUser(null)
-      localStorage.removeItem("carryluxe-user")
+      clearAuthToken()
+      console.log("User logged out, tokens cleared")
     } catch (error) {
       console.error("Logout error:", error)
     }
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateProfile, updatePassword, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        updateProfile,
+        updatePassword,
+        loading,
+        getAuthToken,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

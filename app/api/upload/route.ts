@@ -1,9 +1,33 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { put } from "@vercel/blob"
-import { verifyToken } from "@/lib/auth"
+
+// Simple token verification for demo
+function verifyDemoToken(token: string) {
+  try {
+    const tokenData = JSON.parse(atob(token))
+
+    // Check if token is expired
+    if (tokenData.exp <= Date.now()) {
+      console.log("Token expired")
+      return null
+    }
+
+    // Return user data
+    return {
+      id: tokenData.id,
+      email: tokenData.email,
+      role: tokenData.role,
+    }
+  } catch (error) {
+    console.log("Token verification failed:", error)
+    return null
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("Upload request received")
+
     // Check authentication for admin access
     const authHeader = request.headers.get("authorization")
     const cookieToken = request.cookies.get("auth-token")?.value
@@ -13,18 +37,24 @@ export async function POST(request: NextRequest) {
     // Try to get token from Authorization header first
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7)
+      console.log("Token found in Authorization header")
     }
     // Fallback to cookie
     else if (cookieToken) {
       token = cookieToken
+      console.log("Token found in cookie")
     }
 
     if (!token) {
       console.log("No token found in request")
+      console.log("Authorization header:", authHeader)
+      console.log("Cookie token:", cookieToken)
       return NextResponse.json({ error: "Not authenticated - no token provided" }, { status: 401 })
     }
 
-    const decoded = verifyToken(token)
+    console.log("Verifying token:", token.substring(0, 20) + "...")
+    const decoded = verifyDemoToken(token)
+
     if (!decoded) {
       console.log("Invalid token")
       return NextResponse.json({ error: "Not authenticated - invalid token" }, { status: 401 })
