@@ -1,13 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, Loader2, ImageIcon, Video } from "lucide-react"
+import { X, Loader2, ImageIcon, Video, AlertCircle } from "lucide-react"
 import Image from "next/image"
+import { useAuth } from "@/components/providers/AuthProvider"
 
 interface CloudImageUploadProps {
   value?: string
@@ -26,26 +26,55 @@ export default function CloudImageUpload({
 }: CloudImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
+    // Clear previous errors
+    setError(null)
     setIsUploading(true)
     setUploadProgress(0)
 
     try {
+      // Check if user is authenticated
+      if (!user || user.role !== "admin") {
+        throw new Error("Admin authentication required")
+      }
+
       const formData = new FormData()
       formData.append("file", file)
 
       // Simulate upload progress
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => Math.min(prev + 10, 90))
-      }, 100)
+      }, 200)
+
+      // Get auth token from localStorage or cookie
+      let token = null
+      if (typeof window !== "undefined") {
+        token =
+          localStorage.getItem("auth-token") ||
+          document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("auth-token="))
+            ?.split("=")[1]
+      }
+
+      const headers: HeadersInit = {}
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
+      console.log("Uploading file:", file.name, "Size:", file.size, "Type:", file.type)
 
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
+        headers,
+        credentials: "include", // Include cookies
       })
 
       clearInterval(progressInterval)
@@ -53,17 +82,22 @@ export default function CloudImageUpload({
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || "Upload failed")
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`)
       }
 
       const result = await response.json()
+      console.log("Upload successful:", result.url)
+
       onChange(result.url)
 
       // Reset progress after a brief delay
-      setTimeout(() => setUploadProgress(0), 500)
+      setTimeout(() => {
+        setUploadProgress(0)
+        setError(null)
+      }, 1000)
     } catch (error) {
       console.error("Upload error:", error)
-      alert(`Upload failed: ${error.message}`)
+      setError(error.message || "Upload failed")
       setUploadProgress(0)
     } finally {
       setIsUploading(false)
@@ -74,10 +108,17 @@ export default function CloudImageUpload({
 
   const clearImage = useCallback(() => {
     onChange("")
+    setError(null)
   }, [onChange])
 
   const isVideo = (url: string) => {
-    return url.includes(".mp4") || url.includes(".webm") || url.includes(".mov") || url.includes("video")
+    return (
+      url.includes(".mp4") ||
+      url.includes(".webm") ||
+      url.includes(".mov") ||
+      url.includes("video") ||
+      url.includes(".avi")
+    )
   }
 
   const getAcceptString = () => {
@@ -93,9 +134,29 @@ export default function CloudImageUpload({
     }
   }
 
+  const getFileTypeText = () => {
+    switch (type) {
+      case "image":
+        return "Upload images (JPEG, PNG, WebP, GIF). Max 10MB."
+      case "video":
+        return "Upload videos (MP4, WebM, MOV, AVI). Max 50MB."
+      case "both":
+        return "Upload images (JPEG, PNG, WebP, GIF) or videos (MP4, WebM, MOV, AVI). Max 10MB for images, 50MB for videos."
+      default:
+        return "Upload files. Max 10MB."
+    }
+  }
+
   return (
     <div className="space-y-3">
       {label && <Label>{label}</Label>}
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm">{error}</span>
+        </div>
+      )}
 
       {value ? (
         <div className="relative">
@@ -160,13 +221,7 @@ export default function CloudImageUpload({
             </div>
           )}
 
-          <p className="text-xs text-charcoal-600">
-            {type === "both"
-              ? "Upload images (JPEG, PNG, WebP, GIF) or videos (MP4, WebM, MOV). Max 10MB."
-              : type === "video"
-                ? "Upload videos (MP4, WebM, MOV). Max 10MB."
-                : "Upload images (JPEG, PNG, WebP, GIF). Max 10MB."}
-          </p>
+          <p className="text-xs text-charcoal-600">{getFileTypeText()}</p>
         </div>
       )}
     </div>

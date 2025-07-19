@@ -27,9 +27,6 @@ import {
   Instagram,
   Facebook,
   Twitter,
-  X,
-  ImageIcon,
-  Video,
   Cloud,
 } from "lucide-react"
 import { products as initialProducts, orders, users as initialUsers } from "@/lib/data"
@@ -40,6 +37,7 @@ import Image from "next/image"
 import AdminLayout from "@/components/admin/AdminLayout"
 import SaveButton from "@/components/admin/SaveButton"
 import CloudImageUpload from "@/components/admin/CloudImageUpload"
+import BulkMediaUpload from "@/components/admin/BulkMediaUpload"
 
 // Initial site settings
 const initialSettings = {
@@ -526,50 +524,6 @@ export default function AdminDashboard() {
       alert(`Failed to save homepage settings: ${error.message}. Please try again.`)
       throw error
     }
-  }
-
-  // Hero media management with cloud upload
-  const addHeroMediaFromUpload = async (file: File) => {
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Upload failed")
-      }
-
-      const result = await response.json()
-      const mediaType = file.type.startsWith("video/") ? "video" : "image"
-
-      const newMedia = {
-        type: mediaType,
-        url: result.url,
-        alt: file.name,
-      }
-
-      setHomePageSettings({
-        ...homePageSettings,
-        heroMedia: [...(homePageSettings.heroMedia || []), newMedia],
-      })
-    } catch (error) {
-      console.error("Upload error:", error)
-      alert(`Upload failed: ${error.message}`)
-    }
-  }
-
-  const removeHeroMedia = (index) => {
-    const newMedia = [...homePageSettings.heroMedia]
-    newMedia.splice(index, 1)
-    setHomePageSettings({
-      ...homePageSettings,
-      heroMedia: newMedia,
-    })
   }
 
   // Filter functions
@@ -1479,72 +1433,12 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <Label>Hero Media (Images & Videos)</Label>
-                        <div className="flex space-x-2">
-                          <Input
-                            type="file"
-                            accept="image/*,video/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) {
-                                addHeroMediaFromUpload(file)
-                              }
-                            }}
-                            className="w-auto file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        {homePageSettings.heroMedia?.map((media, index) => (
-                          <div key={index} className="relative">
-                            <div className="relative w-full h-32 bg-cream-100 rounded overflow-hidden">
-                              {media.type === "video" ? (
-                                <video src={media.url} className="w-full h-full object-cover" muted />
-                              ) : (
-                                <Image
-                                  src={media.url || "/placeholder.svg"}
-                                  alt={media.alt || "Hero media"}
-                                  fill
-                                  className="object-cover"
-                                />
-                              )}
-                              <div className="absolute top-2 left-2">
-                                <Badge variant={media.type === "video" ? "default" : "secondary"}>
-                                  {media.type === "video" ? (
-                                    <Video className="h-3 w-3 mr-1" />
-                                  ) : (
-                                    <ImageIcon className="h-3 w-3 mr-1" />
-                                  )}
-                                  {media.type}
-                                </Badge>
-                              </div>
-                              <div className="absolute bottom-2 left-2">
-                                <Badge variant="outline" className="bg-white/80 text-xs">
-                                  <Cloud className="h-3 w-3 mr-1" />
-                                  Cloud
-                                </Badge>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white rounded-full hover:bg-red-600"
-                              onClick={() => removeHeroMedia(index)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-charcoal-800">
-                        Upload multiple images and videos for your hero carousel. Files are stored in Vercel Blob cloud
-                        storage.
-                      </p>
-                    </div>
+                    <BulkMediaUpload
+                      label="Hero Media (Images & Videos)"
+                      value={homePageSettings.heroMedia}
+                      onChange={(media) => setHomePageSettings({ ...homePageSettings, heroMedia: media })}
+                      maxItems={10}
+                    />
                   </CardContent>
                 </Card>
 

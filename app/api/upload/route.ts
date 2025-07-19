@@ -5,15 +5,37 @@ import { verifyToken } from "@/lib/auth"
 export async function POST(request: NextRequest) {
   try {
     // Check authentication for admin access
-    const token = request.cookies.get("auth-token")?.value
+    const authHeader = request.headers.get("authorization")
+    const cookieToken = request.cookies.get("auth-token")?.value
+
+    let token = null
+
+    // Try to get token from Authorization header first
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7)
+    }
+    // Fallback to cookie
+    else if (cookieToken) {
+      token = cookieToken
+    }
+
     if (!token) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+      console.log("No token found in request")
+      return NextResponse.json({ error: "Not authenticated - no token provided" }, { status: 401 })
     }
 
     const decoded = verifyToken(token)
-    if (!decoded || decoded.role !== "admin") {
+    if (!decoded) {
+      console.log("Invalid token")
+      return NextResponse.json({ error: "Not authenticated - invalid token" }, { status: 401 })
+    }
+
+    if (decoded.role !== "admin") {
+      console.log("User role:", decoded.role, "Required: admin")
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
+
+    console.log("Authentication successful for user:", decoded.email)
 
     const formData = await request.formData()
     const file = formData.get("file") as File
@@ -32,23 +54,26 @@ export async function POST(request: NextRequest) {
       "video/mp4",
       "video/webm",
       "video/mov",
+      "video/avi",
+      "video/quicktime",
     ]
 
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         {
-          error: "Invalid file type. Only images (JPEG, PNG, WebP, GIF) and videos (MP4, WebM, MOV) are allowed.",
+          error: `Invalid file type: ${file.type}. Only images (JPEG, PNG, WebP, GIF) and videos (MP4, WebM, MOV, AVI) are allowed.`,
         },
         { status: 400 },
       )
     }
 
-    // Validate file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024 // 10MB
+    // Validate file size (50MB limit for videos, 10MB for images)
+    const maxSize = file.type.startsWith("video/") ? 50 * 1024 * 1024 : 10 * 1024 * 1024
     if (file.size > maxSize) {
+      const maxSizeMB = file.type.startsWith("video/") ? "50MB" : "10MB"
       return NextResponse.json(
         {
-          error: "File too large. Maximum size is 10MB.",
+          error: `File too large. Maximum size is ${maxSizeMB}.`,
         },
         { status: 400 },
       )
@@ -57,14 +82,17 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const fileExtension = file.name.split(".").pop()
+    const fileExtension = file.name.split(".").pop()?.toLowerCase() || "bin"
     const filename = `carryluxe/${timestamp}-${randomString}.${fileExtension}`
+
+    console.log("Uploading file:", filename, "Size:", file.size, "Type:", file.type)
 
     // Upload to Vercel Blob
     const blob = await put(filename, file, {
       access: "public",
-      handleUploadUrl: "/api/upload",
     })
+
+    console.log("Upload successful:", blob.url)
 
     return NextResponse.json({
       success: true,
@@ -78,7 +106,7 @@ export async function POST(request: NextRequest) {
     console.error("Upload error:", error)
     return NextResponse.json(
       {
-        error: "Upload failed. Please try again.",
+        error: `Upload failed: ${error.message || "Unknown error"}`,
       },
       { status: 500 },
     )
