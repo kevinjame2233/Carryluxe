@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 
-const sql = neon(process.env.DATABASE_URL!)
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null
 
 // Admin configuration
 const ADMIN_CONFIG = {
@@ -65,6 +65,10 @@ export async function createUser(
   phone?: string,
 ): Promise<AuthResult> {
   try {
+    if (!sql) {
+      return { success: false, error: "Database not configured" }
+    }
+
     // Check if user already exists
     const existingUser = await sql`
       SELECT id FROM users WHERE email = ${email}
@@ -108,6 +112,10 @@ export async function createUser(
 
 export async function authenticateUser(email: string, password: string): Promise<AuthResult> {
   try {
+    if (!sql) {
+      return { success: false, error: "Database not configured" }
+    }
+
     const result = await sql`
       SELECT id, email, password_hash, first_name, last_name, phone, role, created_at
       FROM users 
@@ -146,6 +154,10 @@ export async function authenticateUser(email: string, password: string): Promise
 
 export async function getUserById(id: number): Promise<User | null> {
   try {
+    if (!sql) {
+      return null
+    }
+
     const result = await sql`
       SELECT id, email, first_name, last_name, phone, role, created_at
       FROM users 
@@ -182,6 +194,10 @@ export async function updateUser(
   },
 ): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
+    if (!sql) {
+      return { success: false, error: "Database not configured" }
+    }
+
     const updateFields = []
     const values = []
 
@@ -246,6 +262,10 @@ export async function updatePassword(
   newPassword: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!sql) {
+      return { success: false, error: "Database not configured" }
+    }
+
     // Get current password hash
     const result = await sql`
       SELECT password_hash FROM users WHERE id = ${id}
@@ -280,6 +300,10 @@ export async function updatePassword(
 
 export async function getUserOrders(userId: number) {
   try {
+    if (!sql) {
+      return []
+    }
+
     const orders = await sql`
       SELECT 
         o.id,
@@ -314,6 +338,10 @@ export async function getUserOrders(userId: number) {
 
 export async function generatePasswordResetToken(email: string): Promise<string | null> {
   try {
+    if (!sql) {
+      return null
+    }
+
     const user = await sql`
       SELECT id FROM users WHERE email = ${email}
     `

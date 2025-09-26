@@ -2,10 +2,14 @@ import { type NextRequest, NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
 import { verifyToken } from "@/lib/auth"
 
-const sql = neon(process.env.DATABASE_URL!)
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null
 
 export async function GET() {
   try {
+    if (!sql) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 })
+    }
+
     const result = await sql`
       SELECT 
         hero_title,
@@ -84,6 +88,10 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    if (!sql) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 })
+    }
+
     const token = request.cookies.get("auth-token")?.value
 
     if (!token) {
