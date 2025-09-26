@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_FONT_GOOGLE_OPTIMIZED: 'false',
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
